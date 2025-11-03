@@ -1,3 +1,4 @@
+from urllib.parse import quote
 import streamlit as st
 import time
 import threading
