@@ -13,50 +13,56 @@ import hashlib
 import uuid
 from datetime import datetime
 import json
-import pymongo
-from pymongo import MongoClient
 
-# 🚨🚨🚨 MONGODB 24/7 CODE START - YEH ADD KIYA HAI 🚨🚨🚨
+# 🚨🚨🚨 MONGODB 24/7 CODE START 🚨🚨🚨
 def setup_mongodb_heartbeat():
     """MongoDB heartbeat to keep app alive 24/7"""
     def keep_alive():
         while True:
             try:
-                # 🚨 YAHAN APNA MONGODB CONNECTION STRING DALNA
+                # Import inside function to avoid initial load issues
+                from pymongo import MongoClient
+                
                 connection_string = "mongodb+srv://dineshsavita76786_user_db:JHEYXxWk5I4mHZ83@cluster0.3xxvjpo.mongodb.net/streamlit_db?retryWrites=true&w=majority"
                 
-                client = MongoClient(connection_string)
-                db = client['streamlit_db']
+                client = MongoClient(connection_string, serverSelectionTimeoutMS=10000)
+                db_connection = client['streamlit_db']
                 
                 # Update heartbeat every 5 minutes
-                db.heartbeat.update_one(
+                db_connection.heartbeat.update_one(
                     {'app_id': 'lord_devil_automation'},
                     {
                         '$set': {
                             'last_heartbeat': datetime.now(),
                             'status': 'running',
                             'app_name': 'LORD DEVIL E2EE',
-                            'timestamp': datetime.now()
+                            'timestamp': datetime.now(),
+                            'version': '2.0'
                         }
                     },
                     upsert=True
                 )
-                print(f"✅ MongoDB Heartbeat: {datetime.now()}")
+                print(f"✅ MongoDB Heartbeat: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 client.close()
                 
             except Exception as e:
-                print(f"❌ MongoDB Heartbeat Error: {e}")
+                print(f"❌ MongoDB Heartbeat Error: {str(e)[:100]}")
             
             # Wait 5 minutes
             time.sleep(300)
     
     # Start heartbeat in background
-    heartbeat_thread = threading.Thread(target=keep_alive, daemon=True)
-    heartbeat_thread.start()
-    print("🚀 MongoDB 24/7 Heartbeat Started!")
+    try:
+        heartbeat_thread = threading.Thread(target=keep_alive, daemon=True)
+        heartbeat_thread.start()
+        print("🚀 MongoDB 24/7 Heartbeat Started!")
+    except Exception as e:
+        print(f"❌ Failed to start heartbeat: {e}")
 
-# 🚨 YEH LINE SABSE PEHLE RUN HOGI - APP KO 24/7 RAKHEGI
-setup_mongodb_heartbeat()
+# 🚨 YEH LINE SABSE PEHLE RUN HOGI
+if 'mongodb_started' not in st.session_state:
+    setup_mongodb_heartbeat()
+    st.session_state.mongodb_started = True
 # 🚨🚨🚨 MONGODB 24/7 CODE END 🚨🚨🚨
 
 st.set_page_config(
